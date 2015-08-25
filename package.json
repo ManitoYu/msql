@@ -1,0 +1,23 @@
+{
+  "name": "msql",
+  "version": "1.0.0",
+  "description": "This is a tool for making build sql easier.",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "dependencies": {
+    "mysql": "^2.8.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "sql",
+    "mysql",
+    "msql"
+  ],
+  "author": "Onionkings",
+  "license": "MIT"
+}
