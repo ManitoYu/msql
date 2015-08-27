@@ -1,14 +1,12 @@
 {
   "name": "msql",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "This is a tool for making build sql easier.",
   "main": "index.js",
   "directories": {
     "test": "tests"
   },
-  "dependencies": {
-    "mysql": "^2.8.0"
-  },
+  "dependencies": {},
   "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"

@@ -1,73 +1,27 @@
-module.exports = (function Msql(table) {
+var utils = require('./lib/utils');
 
-    // 比较操作
-    var _condCompareObj = {
-        $eq: ' = ',
-        $neq: ' <> ',
-        $gt: ' > ',
-        $egt: ' >= ',
-        $lt: ' < ',
-        $elt: ' <= '
-    };
-    var _condCompareKeys = Object.keys(_condCompareObj);
+var configAllowed = ['pk'];
+var configStorage = {};
 
-    // 编译where条件
-    var compileWhere = function (field, obj) {
+function Msql(table) {
 
-        var condType = Object.keys(obj)[0];
-        var condValue = obj[condType];
-        var condReturn;
 
-//       console.log(field, condType, obj[condType]);
-
-        switch (true) {
-            case _condCompareKeys.indexOf(condType) != -1:
-                condReturn = field + _condCompareObj[condType] + condValue;
-                break;
-
-            case condType == '$in':
-                condValue = condValue.map(function (cv) {
-                    if (typeof cv == 'string') {
-                        return '\"' + escape(cv) + '\"';
-                    } else {
-                        return cv;
-                    }
-                });
-                condReturn =  field + ' in ' + '(' + condValue.join(', ') + ')';
-                break;
-
-            case condType == '$like':
-                // 单个like查询
-                if (typeof condValue != 'object') {
-                    return field + ' like \"' + condValue + '\"';
-                }
-                // 多个like查询
-                condReturn = condValue.map(function (itemValue) {
-                    return field + ' like \"' + itemValue + '\"';
-                }).join(' OR ');
-                break;
-
-            default:
-                throw new Error('not allowed query type: ' + condType);
-        }
-        return '(' + condReturn + ')';
-
-    };
+    var config = configStorage[table] || {};
 
     var restriction = {
-        options: {
+        pairs: {
             field: '*',
             table: table
         },
         setWhere: function (where) {
-            this.options.where = where ? ' where ' + where : '';
+            this.pairs.where = where ? ' where ' + where : '';
         },
         setField: function (fields) {
-            this.options.field = fields.join(', ');
+            this.pairs.field = fields.join(', ');
         },
         setCreate: function (createObj) {
-            this.options.createKey = createObj.createKey;
-            this.options.createValue = createObj.createValue;
+            this.pairs.createKey = createObj.createKey;
+            this.pairs.createValue = createObj.createValue;
         }
     };
 
@@ -78,9 +32,26 @@ module.exports = (function Msql(table) {
 
     };
 
+    Msql.config = function (conf) {
+
+        if (! conf) {
+            return Msql;
+        }
+
+        configStorage[table] = {};
+
+        Object.keys(conf).forEach(function (item) {
+            if (configAllowed.indexOf(item) != -1) {
+                configStorage[table][item] = conf[item];
+            }
+        });
+        return Msql(table);
+
+    };
+    
     // select more than one recoreds
     Msql.select = function () {
-        return Msql.replace(sqlTemplate.select);
+        return utils.buildSql(sqlTemplate.select, restriction.pairs);
     };
 
     Msql.where = function (where) {
@@ -109,12 +80,12 @@ module.exports = (function Msql(table) {
 
             // 字符串
             if (typeof value == 'string') {
-                finalWhere[field] = field + ' = \"' + Msql.escape(value) + '\"';
+                finalWhere[field] = field + ' = \"' + utils.escape(value) + '\"';
             }
 
             // 数字
             if (typeof value == 'number') {
-                finalWhere[field] = field + ' = ' + Msql.escape(value);
+                finalWhere[field] = field + ' = ' + value;
             }
 
             // 对象
@@ -123,12 +94,12 @@ module.exports = (function Msql(table) {
                 if (Array.isArray(value)) {
                     // 遍历每一个条件
                     finalWhere[field] = '(' + value.map(function (itemValue) {
-                        return compileWhere(field, itemValue);
+                        return utils.compileWhere(field, itemValue);
                     }).join(' OR ') + ')';
                 }
                 // 对象
                 else {
-                     finalWhere[field] = compileWhere(field, value);
+                     finalWhere[field] = utils.compileWhere(field, value);
                 }
             }
 
@@ -170,7 +141,16 @@ module.exports = (function Msql(table) {
 
     // find only one record
     Msql.find = function (query) {
-        
+        if (typeof query != 'object') {
+            if (! config['pk']) {
+                throw new Error('you may forget set the field served as primary key');
+            }
+            restriction.setWhere(config['pk'] + ' = ' + query);
+        } else {
+            var field = Object.keys(query)[0];
+            restriction.setWhere(field + ' = ' + query[field]);
+        }
+        return utils.buildSql(sqlTemplate.select, restriction.pairs);
     };
 
     // create a new record
@@ -178,7 +158,7 @@ module.exports = (function Msql(table) {
         // 获取值列表
         var values = Object.keys(newObj).map(function (field) {
             if (typeof newObj[field] == 'string') {
-                return '\"' + Msql.escape(newObj[field]) + '\"';
+                return '\"' + utils.escape(newObj[field]) + '\"';
             }
             return newObj[field];
         });
@@ -186,7 +166,7 @@ module.exports = (function Msql(table) {
             createKey: '(' + Object.keys(newObj).join(', ') + ')',
             createValue: '(' + values.join(', ') + ')'
         });
-        return Msql.replace(sqlTemplate.create);
+        return Msql.buildSql(sqlTemplate.create);
     };
 
     // update one or more record
@@ -198,22 +178,9 @@ module.exports = (function Msql(table) {
     Msql.delete = function (query) {
         
     };
-    
-    Msql.replace = function (sqlTemp) {
-        var sql = sqlTemp;
-        var rep = restriction.options;
-        console.log(rep);
-        // 遍历传入的约束条件
-        Object.keys(rep).forEach(function (key) {
-           sql = sql.replace(new RegExp('{' + key + '}', 'g'), rep[key]);
-        });
-        return sql;
-    };
 
-    Msql.escape = function (value) {
-        return value.replace(/([\'\"])/g, '\\$1');
-    }
-    
     return Msql;
 
-});
+}
+
+module.exports = Msql;
