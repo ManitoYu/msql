@@ -1,6 +1,6 @@
 {
   "name": "msql",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "This is a tool for making build sql easier.",
   "main": "index.js",
   "directories": {
