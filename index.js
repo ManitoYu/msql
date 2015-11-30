@@ -216,6 +216,9 @@ function Msql(table) {
             if (typeof newObj[field] == 'string') {
                 return utils.escape(newObj[field]);
             }
+            if(newObj[field] == null){
+                return "null";
+            }
             return newObj[field];
         });
         restriction.setCreate({
